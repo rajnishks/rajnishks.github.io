@@ -54,6 +54,43 @@
       box-shadow: 0 4px 0 #c2186b, 0 8px 16px rgba(194, 24, 107, 0.35);
     }
 
+    #touch {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 18px;
+      padding: 0 18px;
+      justify-content: space-between;
+      align-items: flex-end;
+      pointer-events: none;
+    }
+    #touch.on { display: flex; }
+    #touch button {
+      pointer-events: auto;
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.85);
+      background: rgba(255, 79, 163, 0.55);
+      color: white;
+      font-size: 30px;
+      font-weight: 800;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+    #touch button.jump { width: 104px; height: 104px; font-size: 18px; letter-spacing: 0.06em; }
+    #touch button:active { background: rgba(255, 79, 163, 0.9); }
+    @media (max-width: 600px) {
+      #launch-btn {
+        font-size: 40px;
+        padding: 20px 44px;
+        letter-spacing: 0.08em;
+      }
+      #launch h1 { font-size: 40px; }
+      #hud { font-size: 22px; }
+      .card { min-width: 0; width: 86vw; padding: 24px; }
+    }
+
     #game {
       display: none;
       height: 100%;
@@ -62,6 +99,12 @@
       overflow: hidden;
     }
     #game.active { display: block; }
+    canvas, #game, body {
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
     canvas {
       display: block;
       width: 100%;
@@ -129,6 +172,11 @@
     <canvas id="c"></canvas>
     <div id="hud">Level <span id="level-label">1</span></div>
     <div id="help">Arrow keys move · Space jumps</div>
+    <div id="touch">
+      <button type="button" data-k="left" aria-label="Move left">◀</button>
+      <button type="button" class="jump" data-k="jump" aria-label="Jump">JUMP</button>
+      <button type="button" data-k="right" aria-label="Move right">▶</button>
+    </div>
     <div id="overlay">
       <div class="card">
         <h2 id="overlay-title">Level complete</h2>
@@ -638,30 +686,47 @@
       if (e.code === "Space") jumpHeld = false;
     });
 
+    const touchEl = document.getElementById("touch");
+    const isTouch = window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+    if (isTouch) {
+      touchEl.classList.add("on");
+      document.getElementById("help").style.display = "none";
+    }
+
+    touchEl.querySelectorAll("button").forEach((btn) => {
+      const k = btn.dataset.k;
+      const press = (e) => {
+        e.preventDefault();
+        try {
+          btn.setPointerCapture(e.pointerId);
+        } catch (_) {}
+        if (k === "left") keys.left = true;
+        else if (k === "right") keys.right = true;
+        else {
+          jumpEdge = true;
+          jumpHeld = true;
+        }
+      };
+      const release = () => {
+        if (k === "left") keys.left = false;
+        else if (k === "right") keys.right = false;
+        else jumpHeld = false;
+      };
+      btn.addEventListener("pointerdown", press);
+      btn.addEventListener("pointerup", release);
+      btn.addEventListener("pointercancel", release);
+      btn.addEventListener("lostpointercapture", release);
+    });
+
+    window.addEventListener("blur", () => {
+      keys.left = false;
+      keys.right = false;
+      jumpHeld = false;
+    });
+
     resize();
     requestAnimationFrame(loop);
 
-    window.__probe = () => ({
-      mode,
-      level,
-      x: ball && +ball.x.toFixed(1),
-      y: ball && +ball.y.toFixed(1),
-      vx: ball && +ball.vx.toFixed(2),
-      vy: ball && +ball.vy.toFixed(2),
-      onGround: ball && ball.onGround,
-      finishX,
-      obstacles: obstacles.map((o) => ({ x: Math.round(o.x), y: Math.round(o.y), w: Math.round(o.w), h: Math.round(o.h) })),
-      platforms: platforms.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w) }))
-    });
-    window.__hold = (side) => {
-      keys.left = side === "left";
-      keys.right = side === "right";
-    };
-    window.__jump = (holdMs) => {
-      jumpEdge = true;
-      jumpHeld = true;
-      window.setTimeout(() => { jumpHeld = false; }, holdMs == null ? 160 : holdMs);
-    };
   </script>
 </body>
 </html>
